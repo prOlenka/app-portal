@@ -1,0 +1,33 @@
+server:
+  port: 8018
+spring:
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8080/realms/app-realm
+            user-name-attribute: preferred_username
+        registration:
+#          greetings-app-client-credentials:
+#            provider: keycloak
+#            authorization-grant-type: client_credentials
+#            client-id: app-client
+#            client-secret: dAt6mqso57GuwF0EQ1Mz0VD4rU1Y93M8
+#            scope:
+#              - greetings
+          app-realm-authorization-code:
+            provider: keycloak
+            client-id: app-client
+            client-secret: dAt6mqso57GuwF0EQ1Mz0VD4rU1Y93M8
+            redirect-uri: http://localhost:8082
+            scope:
+              - greetings
+              - openid
+              - microprofile-jwt
+  datasource:
+    url: jdbc:postgresql://localhost:5432/internship
+    username: postgres
+    password: 1234
+  application:
+    name: portal
