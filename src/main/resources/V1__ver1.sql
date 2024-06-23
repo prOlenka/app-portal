@@ -36,3 +36,13 @@ create table "user"
 create unique index user_id_uindex
     on "user" (id);
 
+alter table portal."user"
+    add new_column int;
+
+alter table portal."user"
+    add "companyId" uuid not null;
+
+alter table portal."user"
+    add email text;
+
+

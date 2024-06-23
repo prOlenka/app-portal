@@ -1,11 +1,11 @@
 package com.intership.app_portal.repository;
 
-import com.intership.app_portal.dto.CompanyRequestDTO;
+import com.intership.app_portal.entities.Company;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
 import java.util.UUID;
 
-public interface CompanyRepository extends JpaRepository<CompanyRequestDTO, UUID> {
-        Optional<CompanyRequestDTO> findByName(String name);
-    }
+@Repository
+public interface CompanyRepository extends JpaRepository<Company, UUID> {
+}

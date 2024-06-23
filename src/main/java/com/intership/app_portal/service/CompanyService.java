@@ -1,51 +1,41 @@
 package com.intership.app_portal.service;
 
-import com.intership.app_portal.dto.CompanyRequestDTO;
-import lombok.Getter;
-import lombok.Setter;
-import org.apache.commons.lang.RandomStringUtils;
-import org.json.JSONException;
+import com.intership.app_portal.entities.Company;
+import com.intership.app_portal.entities.User;
+import com.intership.app_portal.roles.Role;
+import com.intership.app_portal.repository.CompanyRepository;
+import com.intership.app_portal.repository.UserRepository;
+import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-import java.io.UnsupportedEncodingException;
-import java.util.UUID;
-
-
-@Getter
-@Setter
+@Service
 public class CompanyService {
-    private String CompanyName;
-    private String CompanyAddress;
-    private String CompanyInn;
-    private String CompanyKpp;
-    private String CompanyOgrn;
-    private String CompanyEmail;
-    private String CompanyOwner;
-    private String password = PasswordService.generatePassword();
 
-    DaDataService daDataService = new DaDataService();
-
-    KeycloakService keycloakService = new KeycloakService();
+    private CompanyRepository companyRepository;
+    private UserRepository userRepository;
 
 
-    public void createCompany(String inn, String kpp, String companyEmail) {
+    @Transactional
+    public Company registerCompany(String name, String inn, String address, String kpp, String ogrn, User registrator) {
+        Company company = new Company();
+        company.setCompanyName(name);
+        company.setCompanyInn(inn);
+        company.setCompanyAddress(address);
+        company.setCompanyKpp(kpp);
+        company.setCompanyOgrn(ogrn);
 
-        try {
-            daDataService.getDaData(inn, kpp);
-        } catch (JSONException | UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-        this.CompanyEmail = companyEmail;
+        Company savedCompany = companyRepository.save(company);
 
-        CompanyRequestDTO dto = new CompanyRequestDTO(CompanyName, CompanyAddress, CompanyInn, CompanyKpp, CompanyOgrn, CompanyEmail ,CompanyOwner, password);
-        keycloakService.addCompany(dto.builder());
+        registrator.setUserRole(Role.ADMIN);
+        registrator.setCompanyId(savedCompany.getId());
+        userRepository.save(registrator);
+
+        return savedCompany;
     }
 
-//    public HttpHeaders update(UUID fromString, PortalCompanyRequest request) {
-//    }
 
-
-    public boolean delete(UUID uuid) {
-        return false;
+    public User findUserByEmail(String email) {
+        return userRepository.findByEmail(email).orElse(null);
     }
-
 }

@@ -1,14 +1,14 @@
 package com.intership.app_portal.dto;
 
-import com.intership.app_portal.roles.Roles;
+import com.intership.app_portal.roles.Role;
 import lombok.Data;
-
-import java.util.UUID;
 
 @Data
 public class UserRequestDTO {
-    private String userName;
-    private String userPassword;
-    private UUID UserId;
-    private Roles UserRole;
+    private String firstName;
+    private String lastName;
+    private String email;
+    private String password;
+    private Role role;
+
 }
