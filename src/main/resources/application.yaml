@@ -1,0 +1,46 @@
+server:
+  port: 8086
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+
+spring:
+  sql:
+    init:
+      mode: never
+  datasource:
+    username: postgres
+    password: 1234
+    url: jdbc:postgresql://localhost:5432/portal
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri:
+            http://${keycloak.host}:${keycloak.port}/realms/${keycloak.realm}/protocol/openid-connect/certs
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_LOGIN:lelya.prosha@gmail.com}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+keycloak:
+  admin:
+    username: ${KEYCLOAK_ADMIN_USERNAME:user1}
+    password: ${KEY_CLOAK_PASSWORD:1234}
+  realm: ${KEYCLOAK_REALM:app-realm}
+  host: localhost
+  port: 8080
+  client-id: app-client
+  client-secret: dAt6mqso57GuwF0EQ1Mz0VD4rU1Y93M8
