@@ -29,7 +29,7 @@ public class DaDataService {
     CompanyRequestDTO companyRequestDTO = new CompanyRequestDTO();
     private final String uri = "http://suggestions.dadata.ru/suggestions/api/4_1/rs/findById/party";
 
-    public boolean getDaData(String INN, String KPP) throws JSONException, UnsupportedEncodingException {
+    public boolean getDaData(String INN, String KPP) {
 
         CloseableHttpClient httpClient = HttpClientBuilder.create().build();
         HttpPost httppost = new HttpPost(getUri());

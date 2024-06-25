@@ -1,9 +1,5 @@
 package com.intership.app_portal.controller;
 
-import com.intership.app_portal.dto.UserRequestDTO;
-import com.intership.app_portal.entities.User;
-import com.intership.app_portal.exceptions.KeycloakException;
-import com.intership.app_portal.exceptions.UserNotFoundException;
 import com.intership.app_portal.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -11,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
 import java.util.UUID;
 
 
@@ -29,7 +26,7 @@ public class UserController {
         try {
             userService.registerUser(firstName, lastName, email);
             return ResponseEntity.ok("User registration successful");
-        } catch (KeycloakException | UserNotFoundException e) {
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }
@@ -43,7 +40,7 @@ public class UserController {
         try {
             userService.updateUser(email, firstName, lastName, newEmail);
             return ResponseEntity.ok("User update successful");
-        } catch (UserNotFoundException e) {
+        } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
@@ -54,7 +51,7 @@ public class UserController {
         try {
             userService.generateNewPassword(email);
             return ResponseEntity.ok("Password reset successful");
-        } catch (UserNotFoundException e) {
+        } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }

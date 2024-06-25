@@ -5,5 +5,5 @@ public enum Role {
     REGISTRATOR,
     LOGIST,
     ADMIN,
-    DRIVER;
+    DRIVER
 }
