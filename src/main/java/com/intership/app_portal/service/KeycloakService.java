@@ -1,134 +1,210 @@
 package com.intership.app_portal.service;
 
-import com.intership.app_portal.dto.CompanyRequestDTO;
-import com.intership.app_portal.dto.UserRequestDTO;
-import com.intership.app_portal.entities.Company;
+import com.intership.app_portal.entities.User;
+import com.intership.app_portal.exceptions.ClientNotFoundException;
+import com.intership.app_portal.exceptions.KeycloakException;
+import com.intership.app_portal.exceptions.UserNotFoundException;
 import com.intership.app_portal.repository.CompanyRepository;
+import com.intership.app_portal.repository.UserRepository;
 import com.intership.app_portal.roles.Role;
-import lombok.RequiredArgsConstructor;
 import org.json.JSONException;
-import org.json.JSONObject;
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.admin.client.resource.RoleMappingResource;
+import org.keycloak.admin.client.resource.RoleResource;
 import org.keycloak.admin.client.resource.UserResource;
-import org.keycloak.admin.client.resource.UsersResource;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
 
+import jakarta.ws.rs.core.Response;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class KeycloakService {
 
     private final Keycloak keycloak;
     private final DaDataService daDataService;
-    private final CompanyRepository companyRepository;
+    private final PasswordService passwordService;
+    private final EmailService emailService;
+    private UserRepository userRepository;
 
     @Value("${keycloak.realm}")
-    private String realm;
+    private String realmName;
 
-    public void addUser(UserRequestDTO dto) {
-        String username = dto.getFirstName() + " " + dto.getLastName();
-        CredentialRepresentation credential = createPasswordCredentials(dto.getPassword());
-        UserRepresentation user = new UserRepresentation();
-        user.setUsername(username);
-        user.setEmail(dto.getEmail());
-        user.setCredentials(Collections.singletonList(credential));
-        user.setEnabled(true);
-        UsersResource usersResource = getUsersResource();
-        usersResource.create(user);
-        addRealmRoleToUser(username, dto.getRole().name());
+    @Autowired
+    public KeycloakService(Keycloak keycloak,
+                           DaDataService daDataService,
+                           PasswordService passwordService,
+                           EmailService emailService) {
+        this.keycloak = keycloak;
+        this.daDataService = daDataService;
+        this.passwordService = passwordService;
+        this.emailService = emailService;
     }
 
-    public void addCompany(CompanyRequestDTO dto) throws JSONException {
-        String companyName = dto.getCompanyName();
-        CredentialRepresentation credential = createPasswordCredentials(dto.getPassword());
-        UserRepresentation user = new UserRepresentation();
-        user.setUsername(companyName);
-        user.setEmail(dto.getCompanyEmail());
-        user.setCredentials(Collections.singletonList(credential));
-        user.setEnabled(true);
-        UsersResource usersResource = getUsersResource();
-        usersResource.create(user);
-        addRealmRoleToCompany(companyName, Role.ADMIN.name());
-
-        JSONObject companyData = daDataService.getDaData(dto.getCompanyInn(), dto.getCompanyKpp());
-        saveCompanyData(companyData);
-    }
-
-    private void saveCompanyData(JSONObject companyData) throws JSONException {
-        Company company = new Company();
-        company.setCompanyName(companyData.getString("name"));
-        company.setCompanyInn(companyData.getString("inn"));
-        company.setCompanyAddress(companyData.getString("address"));
-        company.setCompanyKpp(companyData.getString("kpp"));
-        company.setCompanyOgrn(companyData.getString("ogrn"));
-
-        companyRepository.save(company);
-    }
-
-    public void changePassword(String userId, String newPassword) {
-        CredentialRepresentation credential = createPasswordCredentials(newPassword);
-        UserResource userResource = getUserResource(userId);
-        userResource.resetPassword(credential);
-    }
-
-    public void updateUserData(String userId, String firstName, String lastName, String email) {
-        UserResource userResource = getUserResource(userId);
-        UserRepresentation userRepresentation = userResource.toRepresentation();
+    //REGISTRATOR role
+    public void registerUser(String firstName, String lastName, String email) throws KeycloakException, UserNotFoundException {
+        RealmResource realm = keycloak.realm(realmName);
+        UserRepresentation userRepresentation = new UserRepresentation();
         userRepresentation.setFirstName(firstName);
         userRepresentation.setLastName(lastName);
         userRepresentation.setEmail(email);
+        userRepresentation.setUsername(email);
+        userRepresentation.setEnabled(true);
+
+        // Create the user in Keycloak
+        Response result = realm.users().create(userRepresentation);
+        if (result.getStatus() != Response.Status.CREATED.getStatusCode()) {
+            throw new KeycloakException("Failed to create user");
+        }
+
+        String userId = getCreatedId(result);
+
+        String password = passwordService.generatePassword();
+        CredentialRepresentation credential = new CredentialRepresentation();
+        credential.setTemporary(false);
+        credential.setType(CredentialRepresentation.PASSWORD);
+        credential.setValue(password);
+
+        realm.users().get(userId).resetPassword(credential);
+
+        setRole(realm, userId, Role.REGISTRATOR.name());
+
+        emailService.sendSimpleMessage(email, "Your registration is successful", "Your password is: " + password);
+    }
+
+    // Register a company with ADMIN role for the registrator
+    public void registerCompany(String companyName, String inn, String kpp, String registratorEmail) throws KeycloakException, UserNotFoundException, ClientNotFoundException, UnsupportedEncodingException, JSONException {
+        RealmResource realm = keycloak.realm(realmName);
+        User registrator = userRepository.findByEmail(registratorEmail).orElseThrow(() -> new UserNotFoundException("Registrator not found"));
+        if (!registrator.getUserRole().equals(Role.REGISTRATOR)) {
+            throw new KeycloakException("Only registrators can register companies");
+        }
+
+        if (daDataService.getDaData(inn, kpp)) {
+            //Keycloak
+            ClientRepresentation clientRepresentation = new ClientRepresentation();
+            clientRepresentation.setClientId(companyName);
+
+            Response response = realm.clients().create(clientRepresentation);
+            if (response.getStatus() != Response.Status.CREATED.getStatusCode()) {
+                throw new KeycloakException("Failed to create company");
+            }
+
+            //ADMIN role to registrator
+            ClientResource clientResource = getClientResourceById(realm, companyName);
+            String userId = getUserIdByUserName(realm, registratorEmail);
+            String clientId = getCreatedId(response);
+            addClientRole(realm, userId, clientResource, clientId, Role.ADMIN.name(), companyName);
+        }
+    }
+
+    public void addEmployee(String companyName, String email, String role, String adminEmail) throws KeycloakException, UserNotFoundException, ClientNotFoundException {
+        RealmResource realm = keycloak.realm(realmName);
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow(() -> new UserNotFoundException("Admin not found"));
+        if (!admin.getUserRole().equals(Role.ADMIN)) {
+            throw new KeycloakException("Only admins of the company can add employees");
+        }
+
+        UserRepresentation userRepresentation = getUserRepresentationByUsername(realm, email);
+        String userId = userRepresentation.getId();
+        ClientResource clientResource = getClientResourceById(realm, companyName);
+        String clientId = getClientIdByName(realm, companyName);
+        addClientRole(realm, userId, clientResource, clientId, role, companyName);
+    }
+
+    // Set role for a user
+    private void setRole(RealmResource realm, String userId, String role) throws KeycloakException {
+        RoleResource roleResource = realm.roles().get(role);
+        RoleRepresentation roleRepresentation = roleResource.toRepresentation();
+        realm.users().get(userId).roles().realmLevel().add(Collections.singletonList(roleRepresentation));
+    }
+
+    // Generate new password for user
+    public void generateNewPassword(String email) throws UserNotFoundException {
+        RealmResource realm = keycloak.realm(realmName);
+        UserResource userResource = getUserResourceByEmail(realm, email);
+        String newPassword = passwordService.generatePassword();
+        CredentialRepresentation credential = new CredentialRepresentation();
+        credential.setTemporary(false);
+        credential.setType(CredentialRepresentation.PASSWORD);
+        credential.setValue(newPassword);
+        userResource.resetPassword(credential);
+        emailService.sendSimpleMessage(email, "New password", "Your new password is: " + newPassword);
+    }
+
+    public void updateUser(String email, String firstName, String lastName, String newEmail) throws UserNotFoundException {
+        RealmResource realm = keycloak.realm(realmName);
+        UserResource userResource = getUserResourceByEmail(realm, email);
+        UserRepresentation userRepresentation = userResource.toRepresentation();
+        userRepresentation.setFirstName(firstName);
+        userRepresentation.setLastName(lastName);
+        userRepresentation.setEmail(newEmail);
         userResource.update(userRepresentation);
     }
 
-    public Mono<UserRepresentation> findByEmail(String email) {
-        UsersResource usersResource = getUsersResource();
-        List<UserRepresentation> users = usersResource.search(email, true);
-        if (users.isEmpty()) {
-            return Mono.empty();
+    private UserResource getUserResourceByEmail(RealmResource realm, String email) throws UserNotFoundException {
+        UserRepresentation userRepresentation = realm.users().search(email).stream()
+                .filter(user -> user.getEmail().equals(email))
+                .findFirst()
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        return realm.users().get(userRepresentation.getId());
+    }
+
+    // Helper methods
+    private String getCreatedId(Response response) throws KeycloakException {
+        URI location = response.getLocation();
+        if (location == null) {
+            throw new KeycloakException("Location header is missing in response");
         }
-        return Mono.just(users.get(0));
+        return location.getPath().substring(location.getPath().lastIndexOf('/') + 1);
     }
 
-    private void addRealmRoleToCompany(String companyName, String roleName) {
-        RealmResource realmResource = keycloak.realm(realm);
-        List<UserRepresentation> users = realmResource.users().search(companyName);
-        UserResource userResource = realmResource.users().get(users.get(0).getId());
-        RoleRepresentation role = realmResource.roles().get(roleName).toRepresentation();
-        RoleMappingResource roleMappingResource = userResource.roles();
-        roleMappingResource.realmLevel().add(Collections.singletonList(role));
+    private ClientResource getClientResourceById(RealmResource realm, String clientId) throws ClientNotFoundException {
+        ClientRepresentation clientRepresentation = realm.clients().findByClientId(clientId).stream()
+                .findFirst()
+                .orElseThrow(() -> new ClientNotFoundException("Client not found"));
+        return realm.clients().get(clientRepresentation.getId());
     }
 
-    private void addRealmRoleToUser(String userName, String roleName) {
-        RealmResource realmResource = keycloak.realm(realm);
-        List<UserRepresentation> users = realmResource.users().search(userName);
-        UserResource userResource = realmResource.users().get(users.get(0).getId());
-        RoleRepresentation role = realmResource.roles().get(roleName).toRepresentation();
-        RoleMappingResource roleMappingResource = userResource.roles();
-        roleMappingResource.realmLevel().add(Collections.singletonList(role));
+    private String getClientIdByName(RealmResource realm, String companyName) throws ClientNotFoundException {
+        ClientRepresentation clientRepresentation = realm.clients().findByClientId(companyName).stream()
+                .findFirst()
+                .orElseThrow(() -> new ClientNotFoundException("Client not found"));
+        return clientRepresentation.getId();
     }
 
-    private UsersResource getUsersResource() {
-        return keycloak.realm(realm).users();
+    private UserRepresentation getUserRepresentationByUsername(RealmResource realm, String username) throws UserNotFoundException {
+        return realm.users().searchByUsername(username, true).stream()
+                .findFirst()
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
     }
 
-    private UserResource getUserResource(String userId) {
-        return keycloak.realm(realm).users().get(userId);
+    private String getUserIdByUserName(RealmResource realm, String username) throws UserNotFoundException {
+        return getUserRepresentationByUsername(realm, username).getId();
     }
 
-    private CredentialRepresentation createPasswordCredentials(String password) {
-        CredentialRepresentation passwordCredentials = new CredentialRepresentation();
-        passwordCredentials.setTemporary(false);
-        passwordCredentials.setType(CredentialRepresentation.PASSWORD);
-        passwordCredentials.setValue(password);
-        return passwordCredentials;
+    private void addClientRole(RealmResource realm, String userId, ClientResource clientResource, String clientId, String role, String companyName) throws UserNotFoundException {
+        UserResource userResource = getUserResourceByEmail(realm, userId);
+        RoleRepresentation roleRepresentation = clientResource.roles().get(role).toRepresentation();
+        userResource.roles().clientLevel(clientId).add(Collections.singletonList(roleRepresentation));
+        UserRepresentation userRepresentation = userResource.toRepresentation();
+        Map<String, List<String>> attributes = userRepresentation.getAttributes();
+        if (attributes == null) {
+            attributes = new HashMap<>();
+        }
+        attributes.put(companyName, Collections.singletonList(role));
+        userRepresentation.setAttributes(attributes);
+        userResource.update(userRepresentation);
     }
 }

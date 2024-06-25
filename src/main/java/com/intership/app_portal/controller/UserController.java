@@ -2,6 +2,8 @@ package com.intership.app_portal.controller;
 
 import com.intership.app_portal.dto.UserRequestDTO;
 import com.intership.app_portal.entities.User;
+import com.intership.app_portal.exceptions.KeycloakException;
+import com.intership.app_portal.exceptions.UserNotFoundException;
 import com.intership.app_portal.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -11,22 +13,49 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
-@RestController
-@RequestMapping("/users")
+
 @RequiredArgsConstructor
+@RestController
+@RequestMapping("/api/user")
 public class UserController {
 
-    private final UserService userService;
+    private UserService userService;
 
     @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@RequestBody UserRequestDTO userRequestDTO) {
-        userService.registerUser(userRequestDTO);
-        return ResponseEntity.status(HttpStatus.CREATED).body("User registered successfully");
+    public ResponseEntity<String> registerUser(
+            @RequestParam String firstName,
+            @RequestParam String lastName,
+            @RequestParam String email) {
+        try {
+            userService.registerUser(firstName, lastName, email);
+            return ResponseEntity.ok("User registration successful");
+        } catch (KeycloakException | UserNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
     }
 
-    @PutMapping("/{userId}/password")
-    public ResponseEntity<String> changePassword(@PathVariable String userId, @RequestParam String newPassword) {
-        userService.changePassword(userId, newPassword);
-        return ResponseEntity.ok("Password changed successfully");
+    @PostMapping("/update")
+    public ResponseEntity<String> updateUser(
+            @RequestParam String email,
+            @RequestParam String firstName,
+            @RequestParam String lastName,
+            @RequestParam String newEmail) {
+        try {
+            userService.updateUser(email, firstName, lastName, newEmail);
+            return ResponseEntity.ok("User update successful");
+        } catch (UserNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(
+            @RequestParam String email) {
+        try {
+            userService.generateNewPassword(email);
+            return ResponseEntity.ok("Password reset successful");
+        } catch (UserNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 }

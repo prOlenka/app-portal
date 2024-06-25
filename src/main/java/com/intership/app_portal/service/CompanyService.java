@@ -1,41 +1,33 @@
 package com.intership.app_portal.service;
 
+import com.intership.app_portal.dto.CompanyRequestDTO;
 import com.intership.app_portal.entities.Company;
 import com.intership.app_portal.entities.User;
+import com.intership.app_portal.exceptions.ClientNotFoundException;
+import com.intership.app_portal.exceptions.KeycloakException;
+import com.intership.app_portal.exceptions.UserNotFoundException;
 import com.intership.app_portal.roles.Role;
 import com.intership.app_portal.repository.CompanyRepository;
 import com.intership.app_portal.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import org.json.JSONException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.io.UnsupportedEncodingException;
 
 @Service
 public class CompanyService {
 
-    private CompanyRepository companyRepository;
-    private UserRepository userRepository;
+    private KeycloakService keycloakService;
 
 
-    @Transactional
-    public Company registerCompany(String name, String inn, String address, String kpp, String ogrn, User registrator) {
-        Company company = new Company();
-        company.setCompanyName(name);
-        company.setCompanyInn(inn);
-        company.setCompanyAddress(address);
-        company.setCompanyKpp(kpp);
-        company.setCompanyOgrn(ogrn);
-
-        Company savedCompany = companyRepository.save(company);
-
-        registrator.setUserRole(Role.ADMIN);
-        registrator.setCompanyId(savedCompany.getId());
-        userRepository.save(registrator);
-
-        return savedCompany;
-    }
-
-
-    public User findUserByEmail(String email) {
-        return userRepository.findByEmail(email).orElse(null);
+    public void registerCompany(CompanyRequestDTO companyRequestDTO) throws UserNotFoundException, ClientNotFoundException, JSONException, UnsupportedEncodingException, KeycloakException {
+        keycloakService.registerCompany(
+                companyRequestDTO.getCompanyName(),
+                companyRequestDTO.getCompanyInn(),
+                companyRequestDTO.getCompanyKpp(),
+                companyRequestDTO.getCompanyEmail()
+        );
     }
 }

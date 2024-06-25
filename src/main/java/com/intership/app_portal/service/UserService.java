@@ -2,6 +2,8 @@ package com.intership.app_portal.service;
 
 import com.intership.app_portal.dto.CompanyRequestDTO;
 import com.intership.app_portal.dto.UserRequestDTO;
+import com.intership.app_portal.exceptions.KeycloakException;
+import com.intership.app_portal.exceptions.UserNotFoundException;
 import com.intership.app_portal.roles.Role;
 import lombok.RequiredArgsConstructor;
 import org.json.JSONException;
@@ -16,31 +18,15 @@ public class UserService {
     private final KeycloakService keycloakService;
     private final PasswordService passwordService;
 
-    public void registerCompany(CompanyRequestDTO companyRequestDTO) throws JSONException {
-        keycloakService.addCompany(companyRequestDTO);
+    public void registerUser(String firstName, String lastName, String email) throws KeycloakException, UserNotFoundException {
+        keycloakService.registerUser(firstName, lastName, email);
     }
 
-    public void addEmployee(String adminUserId, UserRequestDTO employeeDTO, Role role) {
-        keycloakService.addUser(employeeDTO);
-        // Additional logic to link the employee to the company
+    public void updateUser(String email, String firstName, String lastName, String newEmail) throws UserNotFoundException {
+        keycloakService.updateUser(email, firstName, lastName, newEmail);
     }
 
-    public String registerUser(UserRequestDTO userRequestDTO) {
-        String password = passwordService.generatePassword();
-        userRequestDTO.setPassword(password);
-        keycloakService.addUser(userRequestDTO);
-        return password;
-    }
-
-    public void changePassword(String userId, String newPassword) {
-        keycloakService.changePassword(userId, newPassword);
-    }
-
-    public void updateUserData(String userId, String firstName, String lastName, String email) {
-        keycloakService.updateUserData(userId, firstName, lastName, email);
-    }
-
-    public Mono<UserRepresentation> findByEmail(String email) {
-        return keycloakService.findByEmail(email);
+    public void generateNewPassword(String email) throws UserNotFoundException {
+        keycloakService.generateNewPassword(email);
     }
 }

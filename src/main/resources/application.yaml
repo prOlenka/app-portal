@@ -39,7 +39,7 @@ keycloak:
   admin:
     username: ${KEYCLOAK_ADMIN_USERNAME:user1}
     password: ${KEY_CLOAK_PASSWORD:1234}
-  realm: ${KEYCLOAK_REALM:app-realm}
+  realm: app-realm
   host: localhost
   port: 8080
   client-id: app-client
