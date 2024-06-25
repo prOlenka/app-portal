@@ -218,4 +218,11 @@ public class KeycloakService {
         UserResource userResource = realm.users().get(id.toString());
         userResource.remove();
     }
+
+    public void findByEmail(String email) throws Exception {
+        keycloak.realm(realmName).users().search(email).stream()
+                .filter(user -> user.getEmail().equals(email))
+                .findFirst()
+                .orElseThrow(() -> new Exception("User not found"));
+    }
 }
