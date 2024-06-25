@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.UUID;
 
 @Service
 public class CompanyService {
@@ -20,5 +21,31 @@ public class CompanyService {
                 companyRequestDTO.getCompanyKpp(),
                 companyRequestDTO.getCompanyEmail()
         );
+    }
+
+    public void updateCompany(CompanyRequestDTO companyRequestDTO) {
+
+        try {
+            keycloakService.updateCompany(
+                    companyRequestDTO.getCompanyName(),
+                    companyRequestDTO.getCompanyAddress(),
+                    companyRequestDTO.getCompanyInn(),
+                    companyRequestDTO.getCompanyKpp(),
+                    companyRequestDTO.getCompanyOgrn(),
+                    companyRequestDTO.getCompanyOwner(),
+                    companyRequestDTO.getCompanyEmail(),
+                    companyRequestDTO.getPassword()
+            );
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void deleteCompany(UUID id) {
+        try {
+            keycloakService.deleteCompany(id);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

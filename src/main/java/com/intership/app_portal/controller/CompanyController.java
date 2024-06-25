@@ -10,9 +10,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/companies")
+@RequestMapping("/portal/v1/company/")
 @RequiredArgsConstructor
 public class CompanyController {
 
@@ -26,5 +27,17 @@ public class CompanyController {
         } catch ( JSONException | UnsupportedEncodingException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
+    }
+
+    @PutMapping("/update")
+    public ResponseEntity<String> updateCompany(@RequestBody CompanyRequestDTO companyRequestDTO){
+        companyService.updateCompany(companyRequestDTO);
+        return ResponseEntity.ok("Company update successful");
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteCompany(@PathVariable UUID id){
+        companyService.deleteCompany(id);
+        return ResponseEntity.ok("Company delete successful");
     }
 }

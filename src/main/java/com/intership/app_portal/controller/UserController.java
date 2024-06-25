@@ -1,5 +1,6 @@
 package com.intership.app_portal.controller;
 
+import com.intership.app_portal.service.KeycloakService;
 import com.intership.app_portal.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -13,12 +14,13 @@ import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/portal/v1")
 public class UserController {
 
     private UserService userService;
+    private KeycloakService keycloakService;
 
-    @PostMapping("/register")
+    @PostMapping("/user")
     public ResponseEntity<String> registerUser(
             @RequestParam String firstName,
             @RequestParam String lastName,
@@ -31,7 +33,7 @@ public class UserController {
         }
     }
 
-    @PostMapping("/update")
+    @PostMapping("/user/update")
     public ResponseEntity<String> updateUser(
             @RequestParam String email,
             @RequestParam String firstName,
@@ -45,13 +47,29 @@ public class UserController {
         }
     }
 
-    @PostMapping("/reset-password")
+
+    @GetMapping("/password/reset-request/{login}")
+    public ResponseEntity<String> getPasswordRequest(@PathVariable String login) {
+        try {
+            // Ensure the user exists in the system
+            userService.findByLogin(login);
+
+            // Generate new password and send it to the user's email
+            keycloakService.generateNewPassword(login);
+
+            return ResponseEntity.ok("Password reset request successful. Check your email for the new password.");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("An error occurred while processing the password reset request");
+        }
+    }
+
+    @PostMapping("/password")
     public ResponseEntity<String> resetPassword(
             @RequestParam String email) {
         try {
             userService.generateNewPassword(email);
             return ResponseEntity.ok("Password reset successful");
-        } catch (IOException e) {
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }

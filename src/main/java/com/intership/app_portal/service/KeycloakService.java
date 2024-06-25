@@ -22,10 +22,7 @@ import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class KeycloakService {
@@ -204,5 +201,21 @@ public class KeycloakService {
         attributes.put(companyName, Collections.singletonList(role));
         userRepresentation.setAttributes(attributes);
         userResource.update(userRepresentation);
+    }
+
+    public void updateCompany(String companyName, String companyAddress, String companyInn, String companyKpp, String companyOgrn, String companyOwner, String companyEmail, String password) throws IOException {
+        RealmResource realm = keycloak.realm(realmName);
+        UserResource userResource = getUserResourceByEmail(realm, companyEmail);
+        UserRepresentation userRepresentation = userResource.toRepresentation();
+        userRepresentation.setFirstName(companyName);
+        userRepresentation.setLastName(companyOwner);
+        userRepresentation.setEmail(companyEmail);
+        userResource.update(userRepresentation);
+    }
+
+    public void deleteCompany(UUID id) throws IOException {
+        RealmResource realm = keycloak.realm(realmName);
+        UserResource userResource = realm.users().get(id.toString());
+        userResource.remove();
     }
 }
